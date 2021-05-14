@@ -14,8 +14,8 @@ set = Settings('settings.json')
 # Подключение к БД
 sql = MSSQLConnection(set.param('sql_server'), set.param('sql_database'), set.param('sql_login'),
                       set.param('sql_password'))
-# Почта.
 
+# Получим список для построения кеша почтовых сообщений.
 query = sql.select('select * from get_mail_list()')
 mail_list = {}
 
