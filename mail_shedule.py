@@ -1,44 +1,61 @@
 import base64
 import os
+import shutil
 import tempfile
 
 from class_email import Email
 from class_mssql import MSSQLConnection
 from class_settings import Settings
 
+# Создаем все нужные классы.
+# Настройки.
 set = Settings('settings.json')
+# Подключение к БД
 sql = MSSQLConnection(set.param('sql_server'), set.param('sql_database'), set.param('sql_login'),
                       set.param('sql_password'))
-mail = Email(sender=set.param('email_sender'), reply_to=set.param('email_reply_to'),
-             recipient='a.kovalenko@pokupochka.ru', subject='Тестовое письмо',
-             message='<h1>Содержимое сообщения</h1><br><p>тест</p>')
-mail.server = set.param('mail_server')
-mail.port = set.param('mail_port')
-mail.login = set.param('mail_login')
-mail.password = set.param('mail_password')
+# Почта.
 
-query = sql.select('select document_uid, name, convert(nvarchar(max), convert(varbinary(max), data)) from [dbo].['
-                   'document_attachments] as att')
-attachmets = {}
+query = sql.select('select * from get_mail_list()')
+mail_list = {}
 
+# Получаем наши будущие письма
 for x in query:
     path = tempfile.gettempdir() + '\\' + str(x[0])
-    file = path + '\\' + x[1]
-    os.makedirs(path, exist_ok=True)
-    with open(file, 'wb') as f:
-        try:
-            f.write(base64.b64decode(x[2], validate=True))
-            if attachmets.get(str(x[0])) is None:
-                attachmets[str(x[0])] = {'files': []}
-            attachmets[str(x[0])]['files'].append({x[1]: file})
-        except Exception as E:
-            print(f'Ошибка записи данных в файл: {file} - {E}')
+    if mail_list.get(str(x[0])) is None:
+        mail_list[str(x[0])] = {'recipients': x[1], 'copy_to': x[2], 'blind_copy_to': x[3], 'topic': x[4], 'body': x[5],
+                                'reply_to': x[6], 'temp_dir': path, 'mail_uid': x[10], 'files': []}
+    if x[7] == 1:
+        file = path + '\\' + x[8]
+        os.makedirs(path, exist_ok=True)
+        with open(file, 'wb') as f:
+            try:
+                f.write(base64.b64decode(x[9], validate=True))
+                mail_list[str(x[0])]['files'].append({x[8]: file})
+            except Exception as E:
+                print(f'Ошибка записи данных в файл: {file} - {E}')
 
-# Собрали все вложения, предварительно выгрузив их из БД.
-print(attachmets)
+# Собрали все данные для отправки почты.
+if len(mail_list) == 0:
+    print('Нет почты для отправки.')
 
-if mail.connect_smtp():
-    mail.attach_file('c:\Temp\9f5837d1-4fe4-11eb-80f4-4c52620055bf\ОтчетПоПродажам.xlsx')
-    mail.attach_file("c:\Temp\9f5837d1-4fe4-11eb-80f4-4c52620055bf\ОтчетДляРетроБонусов.xlsx")
-    if mail.send_email():
-        print('Mail sent')
+for buff in mail_list.keys():
+    record = mail_list[buff]
+    print(f'Отправялем письмо: {record["mail_uid"]}')
+    mail = Email(sender=set.param('email_sender'), reply_to=record['reply_to'],
+                 recipient=record['recipients'], subject=record['topic'],
+                 message=record['body'])
+    mail.server = set.param('mail_server')
+    mail.port = set.param('mail_port')
+    mail.login = set.param('mail_login')
+    mail.password = set.param('mail_password')
+    for f in record['files']:
+        mail.attach_file(*f.values())
+    try:
+        if mail.connect_smtp():
+            if mail.send_email(send_mail=True):
+                sql.execute('update [mail_buffer] set processed = 1 where uid = %s', (str(record["mail_uid"])))
+                print(f'Письмо отправлено: {record["mail_uid"]}')
+    except Exception as E:
+        print(f'Ошибка отправки почты: {E}')
+    # Приберемся за собой.
+    shutil.rmtree(record['temp_dir'], ignore_errors=True)
