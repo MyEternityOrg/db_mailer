@@ -13,6 +13,8 @@ class Email:
             raise Exception("Заполните текст сообщения!")
         if len(reply_to) == 0:
             self.__reply_to = self.__sender
+        else:
+            self.__reply_to = reply_to
         self.__sender = sender
         self.__recipient = recipient
         self.__subject = subject
