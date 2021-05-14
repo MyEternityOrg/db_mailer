@@ -2,6 +2,7 @@ import base64
 import os
 import shutil
 import tempfile
+import time
 
 from class_email import Email
 from class_mssql import MSSQLConnection
@@ -39,6 +40,7 @@ if len(mail_list) == 0:
     print('Нет почты для отправки.')
 
 for buff in mail_list.keys():
+    time.sleep(3)
     record = mail_list[buff]
     print(f'Отправялем письмо: {record["mail_uid"]}')
     mail = Email(sender=set.param('email_sender'), reply_to=record['reply_to'],
@@ -54,8 +56,10 @@ for buff in mail_list.keys():
         if mail.connect_smtp():
             if mail.send_email(send_mail=True):
                 sql.execute('update [mail_buffer] set processed = 1 where uid = %s', (str(record["mail_uid"])))
+                sql.execute('exec [set_next_status] %s, 1', (buff))
                 print(f'Письмо отправлено: {record["mail_uid"]}')
     except Exception as E:
+        sql.execute('exec [set_next_status] %s, 0', (buff))
         print(f'Ошибка отправки почты: {E}')
     # Приберемся за собой.
     shutil.rmtree(record['temp_dir'], ignore_errors=True)
