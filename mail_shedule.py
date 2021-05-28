@@ -43,9 +43,15 @@ for buff in mail_list.keys():
     time.sleep(3)
     record = mail_list[buff]
     print(f'Отправялем письмо: {record["mail_uid"]}')
-    mail = Email(sender=set.param('email_sender'), reply_to=record['reply_to'],
-                 recipient=record['recipients'], subject=record['topic'],
-                 message=record['body'])
+    args = {}
+    Email.combine_args(args, 'sender', set.param('email_sender'))
+    Email.combine_args(args, 'reply_to', record['reply_to'])
+    Email.combine_args(args, 'recipient', record['recipients'])
+    Email.combine_args(args, 'subject', record['topic'])
+    Email.combine_args(args, 'message', record['body'])
+    Email.combine_args(args, 'copy_recipients', record['copy_to'])
+    Email.combine_args(args, 'blind_copy_recipients', record['blind_copy_to'])
+    mail = Email(**args)
     mail.server = set.param('mail_server')
     mail.port = set.param('mail_port')
     mail.login = set.param('mail_login')
