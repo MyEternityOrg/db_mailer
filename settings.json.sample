@@ -1,0 +1,12 @@
+{
+	"mail_server": "mail_srv",
+	"mail_port": 587,
+	"mail_login": "domain\\login",
+	"mail_password": "pass",
+	"email_sender": "from@mail",
+	"email_reply_to": "reply_to@mail",
+	"sql_server": "sql_srv",
+	"sql_database": "sql_db",
+	"sql_login": "login",
+	"sql_password": "pass"
+}
